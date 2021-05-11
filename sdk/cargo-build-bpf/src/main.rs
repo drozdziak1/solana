@@ -131,7 +131,14 @@ fn install_if_missing(
     let source_path = source_base.join(package);
     // Check whether the correct symbolic link exists.
     let missing_source = if source_path.exists() {
-        let invalid_link = if let Ok(link_target) = source_path.read_link() {
+        let invalid_link = if let Ok(mut link_target) = source_path.read_link() {
+            if !link_target.is_absolute() {
+                // canonicalize relative symlink targets
+                let mut new_link_target = source_path.clone();
+                new_link_target.pop();
+                new_link_target.push(&link_target);
+                link_target = new_link_target.canonicalize().map_err(|e| e.to_string())?;
+            }
             link_target != target_path
         } else {
             true
