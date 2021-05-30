@@ -372,7 +372,6 @@ fn build_bpf_package(config: &Config, target_directory: &Path, package: &cargo_m
         &PathBuf::from(bpf_tools_filename),
     )
     .expect("Failed to install bpf-tools");
-    link_bpf_toolchain(&config);
 
     let llvm_bin = config
         .bpf_sdk
@@ -387,14 +386,24 @@ fn build_bpf_package(config: &Config, target_directory: &Path, package: &cargo_m
     let mut rust_flags = String::from("-C lto=no");
     rust_flags.push_str(" -C opt-level=2");
     env::set_var("RUSTFLAGS", rust_flags);
-    let cargo_build = PathBuf::from("cargo");
-    let mut cargo_build_args = vec![
-        "+bpf",
+
+    let mut cargo_build_args = vec![];
+    let cargo_build = match env::var("CARGO") {
+        Ok(base_path_string) => PathBuf::from(base_path_string),
+        Err(_) => {
+            cargo_build_args.push("+bpf");
+            link_bpf_toolchain(&config);
+            PathBuf::from("cargo")
+        }
+    };
+
+    cargo_build_args.append(&mut vec![
         "build",
         "--target",
         "bpfel-unknown-unknown",
         "--release",
-    ];
+    ]);
+
     if config.no_default_features {
         cargo_build_args.push("--no-default-features");
     }
@@ -411,6 +420,18 @@ fn build_bpf_package(config: &Config, target_directory: &Path, package: &cargo_m
     if config.verbose {
         cargo_build_args.push("--verbose");
     }
+
+    let llvm_bin = config
+        .bpf_sdk
+        .join("dependencies")
+        .join("bpf-tools")
+        .join("llvm")
+        .join("bin");
+    env::set_var("CC", llvm_bin.join("clang"));
+    env::set_var("AR", llvm_bin.join("llvm-ar"));
+    env::set_var("OBJDUMP", llvm_bin.join("llvm-objdump"));
+    env::set_var("OBJCOPY", llvm_bin.join("llvm-objcopy"));
+
     spawn(&cargo_build, &cargo_build_args);
 
     if let Some(program_name) = program_name {
