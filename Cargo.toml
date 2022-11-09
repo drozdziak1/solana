@@ -91,3 +91,6 @@ exclude = [
 
 # This prevents a Travis CI error when building for Windows.
 resolver = "2"
+
+[patch.crates-io]
+curve25519-dalek = {git = "https://github.com/drozdziak1/curve25519-dalek", branch = "loosen-zeroize-semver"}
